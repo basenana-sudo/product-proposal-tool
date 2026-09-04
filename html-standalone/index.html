@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>新商品提案ツール｜建築建材</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif; height: 100dvh; overflow: hidden; }
+    .pane-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #9ca3af; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 2px; }
+    .tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; font-size: 11px; }
+    .idea-card { transition: all 0.15s; cursor: pointer; }
+    .idea-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .idea-card.selected { outline: 2px solid #4f46e5; }
+    .panel-overlay { background: rgba(0,0,0,0.35); backdrop-filter: blur(3px); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { animation: spin 0.8s linear infinite; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .fade-in { animation: fadeIn 0.25s ease both; }
+    textarea { resize: none; }
+  </style>
+</head>
+<body class="bg-gray-100 flex flex-col">
+
+  <!-- ヘッダー -->
+  <header class="bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between flex-shrink-0">
+    <div class="flex items-center gap-3">
+      <span class="text-lg">🏗️</span>
+      <div>
+        <h1 class="text-sm font-bold text-gray-900 leading-tight">新商品提案ツール</h1>
+        <p class="text-xs text-gray-400">素材 × 自社商品 → アイデア量産</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="api-badge" class="text-xs text-amber-500"></span>
+      <button onclick="toggleDemo()" id="demo-btn" class="text-xs px-2.5 py-1.5 rounded-lg border transition flex items-center gap-1 border-gray-200 text-gray-500 hover:border-indigo-400 hover:text-indigo-600">
+        🎭 デモ
+      </button>
+      <button onclick="openSettings()" class="text-xs text-gray-500 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition flex items-center gap-1">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+        設定
+      </button>
+    </div>
+  </header>
+
+  <!-- 3ペイン -->
+  <div class="flex flex-1 min-h-0 gap-px bg-gray-200">
+
+    <!-- ① 左：インプット -->
+    <div class="flex flex-col bg-white overflow-y-auto" style="width: 272px; flex-shrink: 0;">
+      <div class="pane-label px-4 pt-3 pb-1">📥 インプット</div>
+
+      <div class="flex-1 px-4 pb-4 space-y-5 pt-2">
+
+        <!-- 市場トレンド -->
+        <section>
+          <label class="block text-xs font-semibold text-gray-700 mb-1.5">市場トレンド</label>
+          <textarea id="trends" rows="3"
+            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300 leading-relaxed"
+            placeholder="例：ZEH義務化、脱炭素・環境配慮、省施工ニーズ…"></textarea>
+        </section>
+
+        <!-- 素材リスト -->
+        <section>
+          <label class="block text-xs font-semibold text-gray-700 mb-1.5">素材リスト</label>
+          <div id="material-tags" class="flex flex-wrap gap-1.5 mb-2"></div>
+          <div class="flex gap-1">
+            <input id="material-input" type="text"
+              class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              placeholder="素材を追加…" onkeydown="tagKeydown(event,'material')" />
+            <button onclick="addTag('material')" class="bg-gray-100 hover:bg-gray-200 rounded-lg px-2.5 py-1.5 text-xs transition">追加</button>
+          </div>
+        </section>
+
+        <!-- 自社商品リスト -->
+        <section>
+          <label class="block text-xs font-semibold text-gray-700 mb-1.5">自社商品ライン</label>
+          <div id="product-tags" class="flex flex-wrap gap-1.5 mb-2"></div>
+          <div class="flex gap-1">
+            <input id="product-input" type="text"
+              class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              placeholder="商品を追加…" onkeydown="tagKeydown(event,'product')" />
+            <button onclick="addTag('product')" class="bg-gray-100 hover:bg-gray-200 rounded-lg px-2.5 py-1.5 text-xs transition">追加</button>
+          </div>
+        </section>
+
+        <!-- 解決したい課題 -->
+        <section>
+          <label class="block text-xs font-semibold text-gray-700 mb-1.5">施設カテゴリ・解決課題</label>
+          <div id="challenge-tags" class="flex flex-wrap gap-1.5 mb-2"></div>
+          <div class="flex gap-1">
+            <input id="challenge-input" type="text"
+              class="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              placeholder="例：物流倉庫向け、漏水対策…" onkeydown="tagKeydown(event,'challenge')" />
+            <button onclick="addTag('challenge')" class="bg-gray-100 hover:bg-gray-200 rounded-lg px-2.5 py-1.5 text-xs transition">追加</button>
+          </div>
+        </section>
+
+        <!-- 生成数 -->
+        <section>
+          <label class="block text-xs font-semibold text-gray-700 mb-1.5">生成件数</label>
+          <div class="flex gap-1.5">
+            <button onclick="setCount(1)"  id="cnt-1"  class="count-btn flex-1 py-1.5 rounded-lg text-xs border border-gray-200 hover:border-indigo-400 transition">1件</button>
+            <button onclick="setCount(3)"  id="cnt-3"  class="count-btn flex-1 py-1.5 rounded-lg text-xs border border-indigo-500 bg-indigo-50 text-indigo-700 font-medium transition">3件</button>
+            <button onclick="setCount(5)"  id="cnt-5"  class="count-btn flex-1 py-1.5 rounded-lg text-xs border border-gray-200 hover:border-indigo-400 transition">5件</button>
+          </div>
+        </section>
+
+        <!-- 生成ボタン -->
+        <button onclick="generate()" id="gen-btn"
+          class="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-3 text-sm font-bold transition flex items-center justify-center gap-2 disabled:opacity-40">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          アイデアを生成
+        </button>
+
+      </div>
+    </div>
+
+    <!-- ② 中央：発想エンジン -->
+    <div class="flex flex-col bg-white flex-1 min-w-0">
+      <div class="pane-label px-4 pt-3 pb-1 flex items-center justify-between flex-shrink-0">
+        <span>⚡ 発想エンジン</span>
+        <button onclick="generate()" id="regen-btn" class="hidden text-xs text-indigo-500 hover:text-indigo-700 flex items-center gap-1 transition">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          再生成
+        </button>
+      </div>
+
+      <div id="ideas-area" class="flex-1 overflow-y-auto px-4 pb-4 pt-2">
+        <!-- 空状態 -->
+        <div id="ideas-empty" class="flex flex-col items-center justify-center h-full text-center pb-12">
+          <div class="text-5xl mb-4 opacity-20">⚡</div>
+          <p class="text-sm text-gray-400 leading-relaxed">
+            左パネルに素材と自社商品を入力して<br>「アイデアを生成」を押してください
+          </p>
+        </div>
+
+        <!-- ローディング -->
+        <div id="ideas-loading" class="hidden flex flex-col items-center justify-center h-full pb-12">
+          <svg class="spinner w-8 h-8 text-indigo-400 mb-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/>
+          </svg>
+          <p class="text-sm text-gray-400">アイデアを生成中…</p>
+        </div>
+
+        <!-- カードグリッド -->
+        <div id="ideas-grid" class="hidden grid grid-cols-2 gap-3 auto-rows-min"></div>
+      </div>
+    </div>
+
+    <!-- ③ 右：提案書 -->
+    <div class="flex flex-col bg-white overflow-y-auto" style="width: 288px; flex-shrink: 0;">
+      <div class="pane-label px-4 pt-3 pb-1 flex items-center justify-between flex-shrink-0">
+        <span>📄 社内提案書</span>
+        <button id="copy-btn" onclick="copyProposal()" class="hidden text-xs text-gray-500 hover:text-indigo-600 flex items-center gap-1 transition">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          コピー
+        </button>
+      </div>
+
+      <div id="proposal-pane" class="flex-1 px-4 pb-4 pt-2">
+
+        <!-- 空状態 -->
+        <div id="proposal-empty" class="flex flex-col items-center justify-center h-full text-center pb-12">
+          <div class="text-4xl mb-3 opacity-20">📄</div>
+          <p class="text-xs text-gray-400 leading-relaxed">
+            中央のアイデアカードを<br>クリックすると提案書を生成します
+          </p>
+        </div>
+
+        <!-- 提案書ローディング -->
+        <div id="proposal-loading" class="hidden flex flex-col items-center justify-center h-full pb-12">
+          <svg class="spinner w-6 h-6 text-amber-400 mb-3" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/>
+          </svg>
+          <p class="text-xs text-gray-400">提案書を作成中…</p>
+        </div>
+
+        <!-- 提案書本体 -->
+        <div id="proposal-content" class="hidden space-y-4 fade-in"></div>
+      </div>
+    </div>
+
+  </div><!-- /3pane -->
+
+  <!-- 設定モーダル -->
+  <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center panel-overlay" onclick="closeOnOverlay(event,'settings-modal')">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
+      <h2 class="text-sm font-bold text-gray-900 mb-4">API設定</h2>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">プロバイダー</label>
+          <select id="api-provider" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" onchange="updateModelOptions()">
+            <option value="openai">OpenAI (GPT)</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="gemini">Google (Gemini)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">モデル</label>
+          <select id="api-model" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" onchange="onModelChange()"></select>
+          <div id="custom-model-wrap" class="hidden mt-1">
+            <input type="text" id="custom-model-input" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" placeholder="例: gemini-2.0-flash" />
+            <p class="text-xs text-gray-400 mt-1">AI Studioで確認したモデル名を入力してください</p>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">APIキー</label>
+          <input type="password" id="api-key-input" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" placeholder="AIza…（Gemini は無料枠あり）" />
+          <p class="text-xs text-gray-400 mt-1">このブラウザの localStorage にのみ保存されます。Geminiのキーは <a href="https://aistudio.google.com/apikey" target="_blank" class="text-indigo-500 underline">AI Studio</a> で無料取得できます</p>
+        </div>
+      </div>
+      <div class="flex gap-2 mt-5">
+        <button onclick="saveSettings()" class="flex-1 bg-indigo-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-indigo-700 transition">保存</button>
+        <button onclick="closeModal('settings-modal')" class="flex-1 border border-gray-200 text-gray-600 rounded-lg py-2 text-sm hover:bg-gray-50 transition">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // ─── Default data ────────────────────────────────────────
+  // 素材：ABC商会製品の基材・素材種別（発想の起点）
+  const DEFAULT_MATERIALS = [
+    'アルミ形材（軽量・高強度・押出成型自在）',
+    'セラミック（耐候性・メンテフリー）',
+    '合成樹脂（エポキシ）（耐薬品・速硬化）',
+    '発泡ウレタン（断熱・気密・吹付施工）',
+    'ゴム（防振・制振・弾性）',
+    '人工大理石（意匠性・耐汚染）',
+    '不燃化粧板（防火・内装仕上げ）',
+    '無機系材料（耐火・耐久・ノーメンテ）',
+  ];
+
+  // 自社商品ライン：ABC商会カタログのカテゴリ（パターンA）
+  const DEFAULT_PRODUCTS = [
+    '合成樹脂系塗り床', '無機系塗り床（硬質床）', '長尺シート・置敷タイル',
+    'セラミックタイル', '内外装ルーバー', '庇・ライトシェルフ',
+    '笠木', '防音パネル・防音ルーバー', '腰壁保護シート',
+    '不燃化粧板（内壁）', '発泡ウレタン断熱材', 'コンクリート補修材',
+    '人工大理石カウンター',
+  ];
+
+  const DEFAULT_TRENDS = '改修・コンバージョン需要増、建築物省エネ法（非住宅）強化、LEED・CASBEE対応ニーズ、BIM/CIM義務化（公共工事）、大規模修繕サイクル対応、維持管理コスト削減、工期短縮・省施工化';
+
+  // 解決したい課題：ABC商会の施設別カテゴリを発想軸に（パターンB）
+  const DEFAULT_CHALLENGES = [
+    '物流倉庫向け', '生産施設（工場）向け', '医療・福祉施設向け',
+    '教育施設向け', '商業施設向け', '厨房向け', '大規模改修向け',
+  ];
+
+  function loadList(key, defaults) {
+    try {
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : [...defaults];
+    } catch (_) { return [...defaults]; }
+  }
+  function saveList(key, list) {
+    localStorage.setItem(key, JSON.stringify(list));
+  }
+
+  let materials  = loadList('pp_materials',  DEFAULT_MATERIALS);
+  let products   = loadList('pp_products',   DEFAULT_PRODUCTS);
+  let challenges = loadList('pp_challenges', DEFAULT_CHALLENGES);
+  let genCount   = 3;
+  let isGenerating = false;
+  let selectedIdea  = null;
+  let isDemoMode = false;
+
+  // ─── Demo data ───────────────────────────────────────────
+  const DEMO_IDEAS = [
+    {
+      combination: 'セラミック × 内外装ルーバー',
+      concept: '意匠性×耐久性×メンテフリー',
+      best_channel: '設計事務所',
+      reason: '高耐候セラミックで意匠と耐久を両立。改修・新築どちらにも対応',
+      novelty: 'セラミック焼付で退色ゼロ、塗り替え不要の外装ルーバー',
+    },
+    {
+      combination: '合成樹脂（エポキシ）× 合成樹脂系塗り床',
+      concept: '耐薬品×防塵×省施工',
+      best_channel: 'GC・元請け',
+      reason: '工場・物流倉庫の床改修を短工期で完結。耐荷重・耐薬品を同時解決',
+      novelty: '1液速硬化タイプで翌日開放、工場稼働への影響を最小化',
+    },
+    {
+      combination: 'アルミ形材 × 庇・ライトシェルフ',
+      concept: '省エネ×採光×意匠',
+      best_channel: '設計事務所',
+      reason: '日射制御と自然採光を両立。LEED・CASBEE加点にも貢献',
+      novelty: '反射板一体型で照明コスト削減、遮熱と採光を同一部材で実現',
+    },
+    {
+      combination: 'ゴム × 防音パネル・防音ルーバー',
+      concept: '遮音×換気×意匠',
+      best_channel: '設計事務所',
+      reason: '防音と換気を同時解決。学校・医療・集合住宅の騒音対策に最適',
+      novelty: '換気性能を維持したまま遮音性能Dr-30以上を達成',
+    },
+    {
+      combination: '発泡ウレタン × 発泡ウレタン断熱材',
+      concept: '断熱改修×気密×省エネ法対応',
+      best_channel: 'GC・元請け',
+      reason: '非住宅省エネ法強化に対応。既存建物の断熱改修を短工期で実現',
+      novelty: '吹付一発施工で気密・断熱を同時達成、大規模改修の工期を30%短縮',
+    },
+  ];
+
+  const DEMO_PROPOSALS = [
+    {
+      product_name: 'セラミコートルーバーSX',
+      catch_copy: '退色ゼロ、メンテフリーの外装美',
+      features: [
+        'セラミック焼付塗装で耐候性50年以上',
+        'アルミ形材ベースで軽量・高強度',
+        '内外装兼用、幅・ピッチのカスタマイズ対応',
+      ],
+      how_to_use: '外壁・外構のルーバーにセラミック焼付塗装を施すことで、塗り替え不要の意匠仕上げを実現。商業施設や公共施設の大規模改修・新築外装に適用。アルミ形材との一体成型で軽量施工が可能。',
+      novelty: '省エネ法強化や長期修繕コスト削減ニーズが高まる中、メンテナンスフリーの外装建材は市場拡大が見込まれる。既存のルーバーラインにセラミック技術を組み合わせることで、自社の新たな高付加価値商品カテゴリを創出できる。',
+      form_text: '【提案概要】セラミック素材とアルミ形材を組み合わせた外装ルーバーの新商品提案です。セラミック焼付塗装により耐候性50年以上・塗り替え不要を実現し、建物のライフサイクルコストを大幅に削減します。省エネ法強化・大規模修繕需要が高まる中、メンテナンスフリーの外装建材として差別化が図れます。内外装兼用・幅/ピッチのカスタマイズ対応により幅広い用途に展開可能です。',
+    },
+    {
+      product_name: 'プラントコートEX-R',
+      catch_copy: '翌日開放、工場床改修の新常識',
+      features: [
+        '1液速硬化型エポキシで施工後12時間で開放',
+        '耐薬品・耐油・防塵を標準装備',
+        '既存床への直接塗布、斫り不要の改修対応',
+      ],
+      how_to_use: '工場・倉庫の既存床に直接塗布。斫り不要で週末2日間の短期施工が可能。食品工場・製造ラインなど稼働を止めにくい施設の改修に最適。エポキシ系塗り床の速硬化特性と耐薬品性を組み合わせて使用する。',
+      novelty: '工場稼働を維持したまま床改修できる商品は市場ニーズが高く、競合製品との差別化ポイントになる。VOCフリー処方と食品衛生法対応を両立することで、食品・医薬品工場という新市場への参入が可能となる。',
+      form_text: '【提案概要】エポキシ素材と塗り床技術を組み合わせた速硬化型工場床材の新商品提案です。施工後12時間で開放できる1液速硬化タイプで、工場稼働を止めずに週末施工で完結します。斫り不要の直接塗布で改修コストを抑えつつ、耐薬品・耐油・防塵性能を標準装備。食品工場・物流倉庫などの改修需要が増加する中、稼働継続と床改修を両立する商品として新たな顧客層へのアプローチが期待できます。',
+    },
+    {
+      product_name: 'ライシェルブリーズSP',
+      catch_copy: '遮る光を、照らす光へ',
+      features: [
+        '高反射アルミ板で太陽光を室内奥まで導光',
+        '夏季の直達日射を遮りながら拡散光を確保',
+        'LEED・CASBEEの採光・日射制御クレジットに対応',
+      ],
+      how_to_use: '南面・西面の窓上部に取り付け、直達日射を遮りながら高反射アルミ板で光を室内奥に導く。オフィス・教育施設・医療施設のZEB改修における日射制御と採光確保を同時に実現する。',
+      novelty: 'ZEB化・省エネ法強化により日射制御建材の需要が急増している。遮熱と採光を1部材で実現する商品は市場にまだ少なく、先行投入することで庇ラインに新しい付加価値カテゴリを確立できる。',
+      form_text: '【提案概要】アルミ形材と庇・ライトシェルフ技術を組み合わせた日射制御・採光建材の新商品提案です。高反射アルミ板が直達日射を遮りながら拡散光を室内奥へ導き、遮熱と採光を1部材で実現します。LEED・CASBEEクレジットにも対応し、ZEB改修案件での採用が見込めます。省エネ法強化を背景に日射制御建材の需要が拡大する中、自社の庇ラインに高付加価値商品を追加できる提案です。',
+    },
+    {
+      product_name: 'オトプルーフ・ベンチレSX',
+      catch_copy: '換気しながら、静かにする',
+      features: [
+        '防音性能Dr-35・換気量450m³/hを同時実現',
+        'アルミ形材フレームで耐候性・意匠性を確保',
+        '縦・横・コーナー設置に対応したフレキシブル設計',
+      ],
+      how_to_use: '学校の音楽室・体育館、病院の設備室、工場の換気ダクト出口など換気と防音の両立が必要な箇所に設置。ゴム防振材と防音パネルをアルミ形材フレームに組み込み、既存換気口への後付け改修にも対応。',
+      novelty: '騒音規制の強化と換気義務化（コロナ以降）が重なり、換気×防音を両立する建材の需要が急増している。ゴムの制振特性と防音パネルを組み合わせた商品は差別化が明確で、学校・医療という安定した市場への参入につながる。',
+      form_text: '【提案概要】ゴム素材と防音パネルを組み合わせた換気・防音一体型建材の新商品提案です。防音性能Dr-35と換気量450m³/hを1ユニットで実現し、「換気か防音か」の二択を解消します。アルミ形材フレームにより耐候性と意匠性を確保し、既存換気口への後付け改修も可能です。騒音規制強化・換気義務化を背景に需要が拡大する学校・医療・工場市場での新たな商品ラインとして提案します。',
+    },
+    {
+      product_name: 'インサルパック改修プロ',
+      catch_copy: '吹くだけで、断熱基準をクリア',
+      features: [
+        '吹付発泡ウレタンで気密・断熱を1工程で完結',
+        '非住宅省エネ法（建築物省エネ法）基準対応',
+        '既存躯体に直接吹付、解体不要の改修対応',
+      ],
+      how_to_use: '築20年以上の非住宅建築（オフィス・倉庫・病院等）の屋根裏や外壁内側に直接吹付。解体不要で施工でき、省エネ改修補助金（環境省・経産省）の対象工事として活用可能。',
+      novelty: '建築物省エネ法の非住宅への適用拡大と改修補助金の充実により、断熱改修市場が急拡大中。吹付発泡ウレタンと既存工法の組み合わせで解体不要・短工期を実現する商品は、改修専門の新しい商品ラインとして位置づけられる。',
+      form_text: '【提案概要】発泡ウレタン素材を用いた非住宅向け断熱改修材の新商品提案です。既存躯体への直接吹付で解体不要・気密・断熱を1工程で完結し、建築物省エネ法の基準に対応します。省エネ改修補助金の活用も想定でき、改修需要が急増する中で自社の断熱材ラインに新たな商品カテゴリを追加できます。ノンフロン処方によりCASBEE環境配慮加点にも対応し、環境意識の高い施主・設計者への訴求が可能です。',
+    },
+  ];
+
+  function toggleDemo() {
+    isDemoMode = !isDemoMode;
+    const btn = document.getElementById('demo-btn');
+    if (isDemoMode) {
+      btn.className = 'text-xs px-2.5 py-1.5 rounded-lg border transition flex items-center gap-1 border-indigo-500 bg-indigo-50 text-indigo-700 font-medium';
+      btn.textContent = '🎭 デモ中';
+    } else {
+      btn.className = 'text-xs px-2.5 py-1.5 rounded-lg border transition flex items-center gap-1 border-gray-200 text-gray-500 hover:border-indigo-400 hover:text-indigo-600';
+      btn.textContent = '🎭 デモ';
+    }
+    updateApiBadge();
+    showToast(isDemoMode ? 'デモモードON：サンプルデータで動作します' : 'デモモードOFF：AIモードに戻りました');
+  }
+
+  // ─── Settings ────────────────────────────────────────────
+  const MODELS = {
+    openai:    ['gpt-4o', 'gpt-4o-mini'],
+    anthropic: ['claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-3-5'],
+    gemini:    ['gemini-2.0-flash-exp', 'gemini-3-flash-preview', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'],
+  };
+
+  function loadSettings() {
+    return {
+      provider: localStorage.getItem('pp_provider') || 'gemini',
+      model:    localStorage.getItem('pp_model')    || 'gemini-2.0-flash-exp',
+      apiKey:   localStorage.getItem('pp_apikey')   || '',
+    };
+  }
+
+  function saveSettings() {
+    const modelSel = document.getElementById('api-model').value;
+    const model = modelSel === '__custom__'
+      ? document.getElementById('custom-model-input').value.trim()
+      : modelSel;
+    localStorage.setItem('pp_provider', document.getElementById('api-provider').value);
+    localStorage.setItem('pp_model',    model);
+    localStorage.setItem('pp_apikey',   document.getElementById('api-key-input').value.trim());
+    closeModal('settings-modal');
+    updateApiBadge();
+  }
+
+  function openSettings() {
+    const s = loadSettings();
+    document.getElementById('api-provider').value = s.provider;
+    updateModelOptions(s.model);
+    document.getElementById('api-key-input').value = s.apiKey;
+    document.getElementById('settings-modal').classList.remove('hidden');
+  }
+
+  function updateModelOptions(sel) {
+    const provider = document.getElementById('api-provider').value;
+    const s = loadSettings();
+    const chosen = sel || s.model;
+    const isCustom = !MODELS[provider].includes(chosen);
+    document.getElementById('api-model').innerHTML =
+      MODELS[provider].map(m => `<option value="${m}" ${m===chosen?'selected':''}>${m}</option>`).join('') +
+      `<option value="__custom__" ${isCustom?'selected':''}>カスタム…</option>`;
+    const wrap = document.getElementById('custom-model-wrap');
+    const input = document.getElementById('custom-model-input');
+    if (isCustom) {
+      wrap.classList.remove('hidden');
+      input.value = chosen;
+    } else {
+      wrap.classList.add('hidden');
+    }
+  }
+
+  function onModelChange() {
+    const val = document.getElementById('api-model').value;
+    const wrap = document.getElementById('custom-model-wrap');
+    const input = document.getElementById('custom-model-input');
+    if (val === '__custom__') {
+      wrap.classList.remove('hidden');
+      input.focus();
+    } else {
+      wrap.classList.add('hidden');
+    }
+  }
+
+  function updateApiBadge() {
+    const el = document.getElementById('api-badge');
+    if (isDemoMode) {
+      el.textContent = '🎭 デモモード';
+      el.className   = 'text-xs text-indigo-500 font-medium';
+      return;
+    }
+    const s = loadSettings();
+    el.textContent = s.apiKey ? `✓ ${s.provider}/${s.model}` : '⚠ APIキー未設定';
+    el.className   = s.apiKey ? 'text-xs text-gray-400' : 'text-xs text-amber-500';
+  }
+
+  // ─── Tag management ──────────────────────────────────────
+  function renderTags(type) {
+    const list = type === 'material' ? materials : type === 'product' ? products : challenges;
+    const color = type === 'material'
+      ? 'bg-teal-50 text-teal-700 border border-teal-100'
+      : type === 'product'
+        ? 'bg-violet-50 text-violet-700 border border-violet-100'
+        : 'bg-orange-50 text-orange-700 border border-orange-100';
+    document.getElementById(`${type}-tags`).innerHTML = list.map((t, i) => `
+      <span class="tag ${color}">
+        ${escHtml(t)}
+        <button onclick="removeTag('${type}',${i})" class="opacity-50 hover:opacity-100 transition ml-0.5 leading-none">&times;</button>
+      </span>`).join('');
+  }
+
+  function addTag(type) {
+    const input = document.getElementById(`${type}-input`);
+    const val = input.value.trim();
+    if (!val) return;
+    if (type === 'material') { materials.push(val); saveList('pp_materials', materials); }
+    else if (type === 'product') { products.push(val); saveList('pp_products', products); }
+    else { challenges.push(val); saveList('pp_challenges', challenges); }
+    input.value = '';
+    renderTags(type);
+  }
+
+  function removeTag(type, idx) {
+    if (type === 'material') { materials.splice(idx, 1); saveList('pp_materials', materials); }
+    else if (type === 'product') { products.splice(idx, 1); saveList('pp_products', products); }
+    else { challenges.splice(idx, 1); saveList('pp_challenges', challenges); }
+    renderTags(type);
+  }
+
+  function tagKeydown(e, type) {
+    if (e.key === 'Enter') { e.preventDefault(); addTag(type); }
+  }
+
+  function setCount(n) {
+    genCount = n;
+    document.querySelectorAll('.count-btn').forEach(b => {
+      const active = b.id === `cnt-${n}`;
+      b.className = `count-btn flex-1 py-1.5 rounded-lg text-xs border transition ${
+        active ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-medium' : 'border-gray-200 hover:border-indigo-400'
+      }`;
+    });
+  }
+
+  // ─── API ─────────────────────────────────────────────────
+  async function callAI(prompt) {
+    const s = loadSettings();
+    if (!s.apiKey) throw new Error('APIキーが未設定です。右上の設定から入力してください。');
+
+    const RETRY_WAIT = 62; // 429時に待つ秒数
+
+    async function doRequest() {
+      const msgs = [{ role: 'user', content: prompt }];
+
+      if (s.provider === 'openai') {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${s.apiKey}` },
+          body: JSON.stringify({ model: s.model, messages: msgs }),
+        });
+        const j = await res.json();
+        if (res.status === 429) return { rateLimit: true };
+        if (!res.ok) throw new Error(j.error?.message || `OpenAI ${res.status}`);
+        return { text: j.choices[0].message.content };
+      }
+
+      if (s.provider === 'anthropic') {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': s.apiKey,
+            'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+          body: JSON.stringify({ model: s.model, max_tokens: 2048, messages: msgs }),
+        });
+        const j = await res.json();
+        if (res.status === 429) return { rateLimit: true };
+        if (!res.ok) throw new Error(j.error?.message || `Anthropic ${res.status}`);
+        return { text: j.content[0].text };
+      }
+
+      if (s.provider === 'gemini') {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${s.model}:generateContent?key=${s.apiKey}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] }) }
+        );
+        const j = await res.json();
+        if (res.status === 429) return { rateLimit: true };
+        if (!res.ok) throw new Error(j.error?.message || `Gemini ${res.status}`);
+        return { text: j.candidates[0].content.parts[0].text };
+      }
+    }
+
+    let result = await doRequest();
+    if (!result.rateLimit) return result.text;
+
+    // 429: カウントダウン表示して自動リトライ
+    await countdown429(RETRY_WAIT);
+    result = await doRequest();
+    if (!result.rateLimit) return result.text;
+    throw new Error('リクエスト過多が続いています。しばらく待ってから再試行してください。');
+  }
+
+  function countdown429(seconds) {
+    return new Promise(resolve => {
+      let remaining = seconds;
+      const el = document.createElement('div');
+      el.id = 'rate-limit-toast';
+      el.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-amber-600 text-white text-xs px-5 py-2.5 rounded-full z-50 font-medium whitespace-nowrap shadow-lg';
+      el.textContent = `⏳ リクエスト制限中… ${remaining}秒後に自動再試行`;
+      document.body.appendChild(el);
+      const timer = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(timer);
+          el.remove();
+          resolve();
+        } else {
+          el.textContent = `⏳ リクエスト制限中… ${remaining}秒後に自動再試行`;
+        }
+      }, 1000);
+    });
+  }
+
+  function parseJSON(raw) {
+    // マークダウンのコードブロックを除去
+    let cleaned = raw.replace(/```(?:json)?\n?/gi, '').replace(/```/g, '').trim();
+
+    const tryParse = (str) => {
+      try { return JSON.parse(str); } catch (_) {}
+      // 文字列リテラル内の改行・タブを修正してリトライ
+      const fixed = str.replace(/("(?:[^"\\]|\\.)*")/g, s =>
+        s.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')
+      );
+      return JSON.parse(fixed);
+    };
+
+    // 最初の文字（{ or [）で外側のコンテナを判定
+    const firstChar = cleaned.match(/^\s*([{\[])/)?.[1];
+
+    if (firstChar === '{') {
+      const mObj = cleaned.match(/\{[\s\S]*\}/);
+      if (mObj) return tryParse(mObj[0]);
+    }
+
+    if (firstChar === '[') {
+      const mArr = cleaned.match(/\[[\s\S]*\]/);
+      if (mArr) return tryParse(mArr[0]);
+    }
+
+    // フォールバック：両方試す
+    const mObj = cleaned.match(/\{[\s\S]*\}/);
+    if (mObj) { try { return tryParse(mObj[0]); } catch (_) {} }
+    const mArr = cleaned.match(/\[[\s\S]*\]/);
+    if (mArr) return tryParse(mArr[0]);
+
+    throw new Error('JSONを抽出できませんでした');
+  }
+
+  // ─── Generate ideas ──────────────────────────────────────
+  async function generate() {
+    if (isGenerating) return;
+    if (materials.length === 0 || products.length === 0) {
+      showToast('素材と自社商品を1つ以上入力してください');
+      return;
+    }
+
+    isGenerating = true;
+    selectedIdea = null;
+    document.getElementById('gen-btn').disabled = true;
+
+    show('ideas-loading');
+    hide('ideas-empty');
+    hide('ideas-grid');
+    hide('proposal-content');
+    show('proposal-empty');
+    document.getElementById('copy-btn').classList.add('hidden');
+    document.getElementById('regen-btn').classList.add('hidden');
+
+    // ── デモモード ───────────────────────────────────────────
+    if (isDemoMode) {
+      await new Promise(r => setTimeout(r, 900));
+      const count = Math.min(genCount, DEMO_IDEAS.length);
+      const shuffled = [...DEMO_IDEAS].sort(() => Math.random() - 0.5).slice(0, count);
+      renderIdeas(shuffled);
+      document.getElementById('regen-btn').classList.remove('hidden');
+      isGenerating = false;
+      document.getElementById('gen-btn').disabled = false;
+      return;
+    }
+    // ─────────────────────────────────────────────────────────
+
+    const trends = document.getElementById('trends').value.trim() || '（指定なし）';
+    const challengeStr = challenges.length > 0 ? challenges.join('、') : '（指定なし）';
+
+    const prompt = `あなたは建築建材の新商品開発エキスパートです。
+以下の条件を元に、建築建材の新商品アイデアを${genCount}件考えてください。
+
+【求めるアイデアの質：重要】
+「この素材をこの商品カテゴリに組み込むと、何が新しく実現できるか」を起点に発想してください。
+・単純な「素材Aと商品Bを組み合わせる」ではなく、「その組み合わせによって何の課題がどう解決されるか」を中心に考えること
+・既存品と明確に違う点（機能・施工性・コスト・意匠等）が1つ以上ある案のみ提案すること
+・アイデアは互いに似通わないよう、素材・商品・課題軸をそれぞれ分散させること
+
+【自社について】
+自社はメーカー寄りの建材専門会社（塗り床・ルーバー・防音パネル・断熱材等）で、自社商品を中心に設計事務所・建設会社へ提案している。
+新商品は自社が新たに開発・展開する自社商品ラインの候補として提案する。
+
+【前提：固定条件】
+・営業先は「設計事務所」「GC（ゼネコン・元請け）」「地場建築現場（飛び込み）」の3チャネル
+・主な市場は商業施設・官公庁（優先）。商品次第で戸建て用途も可だが、住宅専用案は避ける
+・課題軸・施設別ターゲット：${challengeStr}
+  ※施設カテゴリが指定されている場合、その施設に特有の課題（衛生管理・耐荷重・騒音等）を踏まえて発想すること
+
+【入力データ】
+市場トレンド：${trends}
+素材・基材種別：${materials.join('、')}
+自社商品ライン（ABC商会カタログカテゴリ）：${products.join('、')}
+
+以下のJSON配列のみ返してください（余分な説明は不要）：
+[
+  {
+    "combination": "素材名 × 商品ライン名 → 実現する価値（例：発泡ウレタン × 塗り床 → 断熱+仕上げ一体施工で工期短縮）",
+    "product_concept": "具体的な商品イメージ（例：病院向け抗菌断熱塗り床、外壁用自浄ルーバー）（25字以内）",
+    "concept": "コンセプトキーワード（例：省施工×断熱×再生材）",
+    "best_channel": "設計事務所 or GC or 現場飛び込み（最も刺さる営業先1つ）",
+    "reason": "この組み合わせが有効な理由・解決できる顧客課題（50字以内）",
+    "novelty": "既存品と何が違うか（競合・自社既存品との差別化ポイント）（40字以内）"
+  }
+]`;
+
+    try {
+      const raw = await callAI(prompt);
+      const ideas = parseJSON(raw);
+      renderIdeas(ideas);
+      document.getElementById('regen-btn').classList.remove('hidden');
+    } catch (e) {
+      hide('ideas-loading');
+      show('ideas-empty');
+      showError(e.message);
+    } finally {
+      isGenerating = false;
+      document.getElementById('gen-btn').disabled = false;
+    }
+  }
+
+  const CARD_COLORS = [
+    { bg: 'bg-indigo-50', border: 'border-indigo-100', badge: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-400' },
+    { bg: 'bg-teal-50',   border: 'border-teal-100',   badge: 'bg-teal-100 text-teal-700',   dot: 'bg-teal-400'   },
+    { bg: 'bg-amber-50',  border: 'border-amber-100',  badge: 'bg-amber-100 text-amber-700',  dot: 'bg-amber-400'  },
+    { bg: 'bg-rose-50',   border: 'border-rose-100',   badge: 'bg-rose-100 text-rose-700',   dot: 'bg-rose-400'   },
+    { bg: 'bg-violet-50', border: 'border-violet-100', badge: 'bg-violet-100 text-violet-700',dot: 'bg-violet-400' },
+  ];
+
+  function renderIdeas(ideas) {
+    hide('ideas-loading');
+    const grid = document.getElementById('ideas-grid');
+    grid.innerHTML = ideas.map((idea, i) => {
+      const c = CARD_COLORS[i % CARD_COLORS.length];
+      return `
+        <div class="idea-card rounded-xl border ${c.bg} ${c.border} p-3.5 fade-in" style="animation-delay:${i*60}ms" onclick="selectIdea(${i})" data-idx="${i}">
+          <div class="flex items-start gap-2 mb-1.5">
+            <div class="w-2 h-2 rounded-full ${c.dot} mt-1 flex-shrink-0"></div>
+            <p class="text-xs font-bold text-gray-800 leading-snug">${escHtml(idea.combination)}</p>
+          </div>
+          ${idea.product_concept ? `<p class="text-xs font-semibold text-gray-700 bg-white bg-opacity-70 rounded-lg px-2 py-1 mb-2 border ${c.border}">🧱 ${escHtml(idea.product_concept)}</p>` : ''}
+          <span class="inline-block text-xs px-2 py-0.5 rounded-full ${c.badge} font-medium mb-2">${escHtml(idea.concept)}</span>
+          <p class="text-xs text-gray-600 leading-relaxed mb-1">📣 ${escHtml(idea.best_channel || idea.target || '—')}</p>
+          <p class="text-xs text-gray-500 leading-relaxed">✨ ${escHtml(idea.novelty)}</p>
+        </div>`;
+    }).join('');
+    grid.dataset.ideas = JSON.stringify(ideas);
+    grid.classList.remove('hidden');
+  }
+
+  // ─── Select idea → proposal ───────────────────────────────
+  async function selectIdea(idx) {
+    document.querySelectorAll('.idea-card').forEach(c => c.classList.remove('selected'));
+    document.querySelector(`[data-idx="${idx}"]`)?.classList.add('selected');
+
+    const ideas = JSON.parse(document.getElementById('ideas-grid').dataset.ideas || '[]');
+    const idea = ideas[idx];
+    if (!idea) return;
+    selectedIdea = idea;
+
+    hide('proposal-empty');
+    hide('proposal-content');
+    show('proposal-loading');
+    document.getElementById('copy-btn').classList.add('hidden');
+
+    // ── デモモード ───────────────────────────────────────────
+    if (isDemoMode) {
+      await new Promise(r => setTimeout(r, 700));
+      const demoIdx = DEMO_IDEAS.findIndex(d => d.combination === idea.combination);
+      const proposal = demoIdx >= 0 ? DEMO_PROPOSALS[demoIdx] : DEMO_PROPOSALS[idx % DEMO_PROPOSALS.length];
+      renderProposal(proposal, idea);
+      return;
+    }
+    // ─────────────────────────────────────────────────────────
+
+    const trends = document.getElementById('trends').value.trim() || '（指定なし）';
+
+    const challengeStr = challenges.length > 0 ? challenges.join('、') : '（指定なし）';
+
+    const prompt = `あなたは建築建材の商品企画アドバイザーです。
+以下のアイデアをもとに、社内新商品提案フォーム用の提案書を作成してください。
+
+【求めるアウトプットの質：重要】
+・商品名は特徴・素材・用途が一目でわかる具体的な名前にする（例：「抗菌セラミック塗り床 HC-S」「自浄コーティングルーバー ECO-V」）
+・特徴3点は「素材の特性を活かした機能」「施工・コスト面のメリット」「競合・既存品との明確な差」をそれぞれ1点ずつ書く
+・how_to_useは設計者や施工会社が採用を検討する具体的なシーン（施設名・場所・使われ方）を交えて書く
+・noveltyは「自社の既存ラインになかった理由」「今このタイミングで出す根拠」を含めて書く
+
+【アイデア情報】
+組み合わせ：${idea.combination}
+商品コンセプト：${idea.product_concept || '（指定なし）'}
+コンセプト：${idea.concept}
+有効な理由・解決課題：${idea.reason}
+新規性・差別化：${idea.novelty}
+市場トレンド：${trends}
+施設カテゴリ・課題軸：${challengeStr}
+
+以下のJSON形式のみ返してください（余分な説明は不要）：
+{
+  "product_name": "商品名（素材・機能・用途が伝わる具体的な名前）",
+  "catch_copy": "一言コンセプト（20字以内）",
+  "features": [
+    "機能面の特徴：素材の特性を活かした具体的な機能（数値・比較あるとなお良い）",
+    "施工・運用面：コスト・工期・メンテナンス等のメリット",
+    "差別化：競合品や自社既存品と何が違うか"
+  ],
+  "how_to_use": "どんな施設・空間で、誰がどう採用・施工するか（設計者・施工者の視点で具体的に）（2〜3行）",
+  "novelty": "自社にとっての新規性・市場機会・なぜ今この提案なのか（2〜3行）",
+  "form_text": "社内新商品提案フォームの内容欄にそのまま貼れる文章（150〜250字）。商品の特徴・使い方・新規性を簡潔にまとめ、担当者が内容を理解できる説明にする。顧客名・物件名は含めない。"
+}`;
+
+    try {
+      const raw = await callAI(prompt);
+      console.log('[DEBUG] raw response:', raw);
+      let proposal;
+      try {
+        proposal = parseJSON(raw);
+        console.log('[DEBUG] parsed proposal:', proposal);
+      } catch (parseErr) {
+        console.error('[DEBUG] parseJSON failed:', parseErr);
+        throw parseErr;
+      }
+      renderProposal(proposal, idea);
+    } catch (e) {
+      hide('proposal-loading');
+      show('proposal-empty');
+      showError(e.message);
+    }
+  }
+
+  function renderProposal(p, idea) {
+    hide('proposal-loading');
+    const content = document.getElementById('proposal-content');
+    content.innerHTML = `
+      <div class="fade-in">
+        <!-- 商品名 -->
+        <div class="bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-xl p-4 text-white mb-3">
+          <p class="text-xs opacity-75 mb-0.5">商品名</p>
+          <p class="text-base font-bold leading-snug">${escHtml(p.product_name)}</p>
+          <p class="text-xs opacity-90 mt-1.5 italic">"${escHtml(p.catch_copy)}"</p>
+        </div>
+
+        <!-- 組み合わせ -->
+        <div class="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 mb-3">
+          🔗 ${escHtml(idea.combination)}
+        </div>
+
+        <!-- 特徴 -->
+        <div class="mb-3">
+          <p class="text-xs font-semibold text-gray-700 mb-1.5">🔧 この素材・商品の特徴</p>
+          <ul class="space-y-1">
+            ${(p.features||[]).map(f => `<li class="text-xs text-gray-700 flex gap-1.5"><span class="text-indigo-400 flex-shrink-0">▸</span>${escHtml(f)}</li>`).join('')}
+          </ul>
+        </div>
+
+        <!-- どう使うか -->
+        <div class="bg-gray-50 rounded-lg px-3 py-2.5 mb-3">
+          <p class="text-xs font-semibold text-gray-700 mb-1">🏗 どう使うか</p>
+          <p class="text-xs text-gray-600 leading-relaxed">${escHtml(p.how_to_use)}</p>
+        </div>
+
+        <!-- 新規性 -->
+        <div class="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2.5 mb-3">
+          <p class="text-xs font-semibold text-indigo-700 mb-1">💡 会社への新規性・なぜ今か</p>
+          <p class="text-xs text-indigo-800 leading-relaxed">${escHtml(p.novelty)}</p>
+        </div>
+
+        <!-- フォーム用テキスト -->
+        <div class="border border-dashed border-gray-300 rounded-lg px-3 py-2.5">
+          <div class="flex items-center justify-between mb-1.5">
+            <p class="text-xs font-semibold text-gray-700">📋 フォーム用テキスト</p>
+            <button onclick="copyFormText()" class="text-xs text-indigo-600 hover:text-indigo-800 transition font-medium">コピー</button>
+          </div>
+          <p class="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap" id="form-text-content">${escHtml(p.form_text)}</p>
+        </div>
+      </div>`;
+
+    content.classList.remove('hidden');
+    document.getElementById('copy-btn').classList.remove('hidden');
+    content.dataset.proposal = JSON.stringify({ idea, proposal: p });
+  }
+
+  function copyProposal() {
+    const data = JSON.parse(document.getElementById('proposal-content').dataset.proposal || '{}');
+    if (!data.proposal) return;
+    const p = data.proposal;
+    const idea = data.idea;
+    const text = [
+      `【新商品提案】${p.product_name}`,
+      `"${p.catch_copy}"`,
+      ``,
+      `■ 組み合わせ：${idea.combination}`,
+      ``,
+      `■ 特徴`,
+      ...(p.features||[]).map(f => `  ▸ ${f}`),
+      ``,
+      `■ どう使うか`,
+      p.how_to_use,
+      ``,
+      `■ 会社への新規性・なぜ今か`,
+      p.novelty,
+      ``,
+      `■ フォーム用テキスト`,
+      p.form_text,
+    ].join('\n');
+
+    navigator.clipboard.writeText(text).then(() => showToast('クリップボードにコピーしました ✓'));
+  }
+
+  function copyFormText() {
+    const el = document.getElementById('form-text-content');
+    if (!el) return;
+    navigator.clipboard.writeText(el.textContent).then(() => showToast('フォーム用テキストをコピーしました ✓'));
+  }
+
+  // ─── Helpers ─────────────────────────────────────────────
+  function show(id) { document.getElementById(id).classList.remove('hidden'); }
+  function hide(id) { document.getElementById(id).classList.add('hidden'); }
+  function escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+  function closeOnOverlay(e, id) { if (e.target.id === id) closeModal(id); }
+
+  function showToast(msg, err = false) {
+    const el = document.createElement('div');
+    el.className = `fixed bottom-6 left-1/2 -translate-x-1/2 ${err?'bg-red-600':'bg-gray-800'} text-white text-xs px-4 py-2 rounded-full z-50 opacity-0 transition-opacity duration-300 pointer-events-none whitespace-nowrap`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.style.opacity = '1');
+    setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3000);
+  }
+
+  function showError(msg) { showToast('⚠️ ' + msg, true); }
+
+  // ─── Init ─────────────────────────────────────────────────
+  updateModelOptions();
+  updateApiBadge();
+  document.getElementById('trends').value = DEFAULT_TRENDS;
+  renderTags('material');
+  renderTags('product');
+  renderTags('challenge');
+  </script>
+</body>
+</html>

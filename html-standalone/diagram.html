@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>新商品提案ツール｜仕組み図解</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif; background: #f0f4ff; }
+    .arrow-right::after {
+      content: '';
+      display: block;
+      width: 0; height: 0;
+      border-top: 10px solid transparent;
+      border-bottom: 10px solid transparent;
+      border-left: 16px solid #6366f1;
+      margin: auto;
+    }
+    .arrow-down::after {
+      content: '';
+      display: block;
+      width: 0; height: 0;
+      border-left: 10px solid transparent;
+      border-right: 10px solid transparent;
+      border-top: 16px solid #6366f1;
+      margin: auto;
+    }
+    .arrow-down-gray::after {
+      content: '';
+      display: block;
+      width: 0; height: 0;
+      border-left: 10px solid transparent;
+      border-right: 10px solid transparent;
+      border-top: 16px solid #9ca3af;
+      margin: auto;
+    }
+    .flow-line {
+      width: 2px;
+      background: linear-gradient(to bottom, #6366f1, #8b5cf6);
+      margin: 0 auto;
+    }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; }
+    @keyframes pulse-soft {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .pulse { animation: pulse-soft 2s ease-in-out infinite; }
+    .section-divider {
+      background: linear-gradient(90deg, transparent, #6366f1 20%, #8b5cf6 80%, transparent);
+      height: 2px;
+      margin: 0 auto;
+      width: 60%;
+      border-radius: 1px;
+    }
+  </style>
+</head>
+<body class="min-h-screen py-10 px-4">
+
+  <div class="max-w-4xl mx-auto">
+
+    <!-- タイトル -->
+    <div class="text-center mb-10">
+      <div class="inline-flex items-center gap-2 bg-white rounded-2xl px-6 py-3 shadow-sm border border-indigo-100 mb-4">
+        <span class="text-2xl">🏗️</span>
+        <div class="text-left">
+          <p class="text-xs text-gray-400 font-medium">仕組み図解</p>
+          <h1 class="text-lg font-bold text-gray-900 leading-tight">新商品提案ツール</h1>
+        </div>
+      </div>
+      <p class="text-sm text-gray-500">素材 × 自社商品 → アイデア量産 → 提案書を自動生成</p>
+    </div>
+
+
+    <!-- ① 全体コンセプト -->
+    <section class="mb-10">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
+        <h2 class="text-sm font-bold text-gray-800">このツールは何をするもの？</h2>
+      </div>
+
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-indigo-50">
+        <p class="text-center text-xs text-gray-500 mb-4">人間がやること vs ツールがやること</p>
+        <div class="grid grid-cols-2 gap-4">
+          <!-- 人間 -->
+          <div class="bg-red-50 rounded-xl p-4 border border-red-100">
+            <p class="text-xs font-bold text-red-600 mb-3">😓 ツールなし</p>
+            <div class="space-y-2 text-xs text-gray-700">
+              <div class="flex items-start gap-2"><span>①</span><span>「どの素材と商品を組み合わせようか…」と悩む</span></div>
+              <div class="flex items-start gap-2"><span>②</span><span>アイデアをメモ帳やExcelに手書き</span></div>
+              <div class="flex items-start gap-2"><span>③</span><span>提案書をWordやPowerPointで一から作成</span></div>
+              <div class="flex items-start gap-2"><span>④</span><span>営業先ごとにトークを考える</span></div>
+            </div>
+            <div class="mt-3 text-center">
+              <span class="badge bg-red-100 text-red-600">⏱ 数時間〜数日</span>
+            </div>
+          </div>
+          <!-- ツールあり -->
+          <div class="bg-green-50 rounded-xl p-4 border border-green-100">
+            <p class="text-xs font-bold text-green-600 mb-3">🚀 ツールあり</p>
+            <div class="space-y-2 text-xs text-gray-700">
+              <div class="flex items-start gap-2"><span>①</span><span>素材・商品・施設カテゴリを選ぶだけ</span></div>
+              <div class="flex items-start gap-2"><span>②</span><span>「生成」を押すとアイデアが5〜10件出る</span></div>
+              <div class="flex items-start gap-2"><span>③</span><span>気に入ったカードをクリックするだけ</span></div>
+              <div class="flex items-start gap-2"><span>④</span><span>営業先別トークも自動生成</span></div>
+            </div>
+            <div class="mt-3 text-center">
+              <span class="badge bg-green-100 text-green-600">⚡ 数十秒</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ② 画面の3ペイン構成 -->
+    <section class="mb-10">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
+        <h2 class="text-sm font-bold text-gray-800">画面は3つのエリアに分かれている</h2>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-indigo-50 overflow-hidden">
+        <!-- ヘッダーのモック -->
+        <div class="bg-gray-800 px-4 py-2 flex items-center gap-2">
+          <div class="w-3 h-3 rounded-full bg-red-400"></div>
+          <div class="w-3 h-3 rounded-full bg-yellow-400"></div>
+          <div class="w-3 h-3 rounded-full bg-green-400"></div>
+          <span class="text-xs text-gray-400 ml-2">localhost:3333</span>
+        </div>
+
+        <!-- ツールヘッダーのモック -->
+        <div class="bg-white border-b border-gray-100 px-4 py-2.5 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span>🏗️</span>
+            <span class="text-xs font-bold text-gray-800">新商品提案ツール</span>
+          </div>
+          <div class="flex gap-2">
+            <span class="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-lg font-medium">🎭 デモ中</span>
+            <span class="text-xs text-gray-400 border border-gray-200 px-2 py-0.5 rounded-lg">設定</span>
+          </div>
+        </div>
+
+        <!-- 3ペイン -->
+        <div class="grid grid-cols-3 divide-x divide-gray-100 bg-gray-50">
+
+          <!-- 左ペイン -->
+          <div class="p-4 bg-white">
+            <div class="flex items-center gap-1.5 mb-3">
+              <span class="w-5 h-5 rounded-full bg-teal-500 text-white text-xs font-bold flex items-center justify-center">A</span>
+              <span class="text-xs font-bold text-gray-700">インプット</span>
+            </div>
+            <div class="space-y-2">
+              <div class="bg-gray-50 border border-gray-200 rounded-lg p-2">
+                <p class="text-xs text-gray-500 mb-1">📈 市場トレンド</p>
+                <p class="text-xs text-gray-400 leading-relaxed">改修需要増、省エネ法強化、BIM義務化…</p>
+              </div>
+              <div class="bg-teal-50 border border-teal-100 rounded-lg p-2">
+                <p class="text-xs text-teal-600 font-medium mb-1">🧱 素材リスト</p>
+                <div class="flex flex-wrap gap-1">
+                  <span class="text-xs bg-teal-100 text-teal-700 rounded-full px-2 py-0.5">アルミ形材</span>
+                  <span class="text-xs bg-teal-100 text-teal-700 rounded-full px-2 py-0.5">セラミック</span>
+                  <span class="text-xs bg-teal-100 text-teal-700 rounded-full px-2 py-0.5">ゴム</span>
+                </div>
+              </div>
+              <div class="bg-violet-50 border border-violet-100 rounded-lg p-2">
+                <p class="text-xs text-violet-600 font-medium mb-1">🏢 自社商品ライン</p>
+                <div class="flex flex-wrap gap-1">
+                  <span class="text-xs bg-violet-100 text-violet-700 rounded-full px-2 py-0.5">塗り床</span>
+                  <span class="text-xs bg-violet-100 text-violet-700 rounded-full px-2 py-0.5">ルーバー</span>
+                </div>
+              </div>
+              <div class="bg-orange-50 border border-orange-100 rounded-lg p-2">
+                <p class="text-xs text-orange-600 font-medium mb-1">🏭 施設カテゴリ</p>
+                <div class="flex flex-wrap gap-1">
+                  <span class="text-xs bg-orange-100 text-orange-700 rounded-full px-2 py-0.5">工場向け</span>
+                  <span class="text-xs bg-orange-100 text-orange-700 rounded-full px-2 py-0.5">医療向け</span>
+                </div>
+              </div>
+              <button class="w-full bg-indigo-600 text-white text-xs py-2 rounded-lg font-medium">▶ アイデアを生成</button>
+            </div>
+          </div>
+
+          <!-- 中央ペイン -->
+          <div class="p-4">
+            <div class="flex items-center gap-1.5 mb-3">
+              <span class="w-5 h-5 rounded-full bg-indigo-500 text-white text-xs font-bold flex items-center justify-center">B</span>
+              <span class="text-xs font-bold text-gray-700">発想エンジン</span>
+            </div>
+            <div class="space-y-2">
+              <div class="bg-indigo-50 border-2 border-indigo-400 rounded-lg p-2.5 cursor-pointer">
+                <p class="text-xs font-bold text-gray-800">セラミック × 内外装ルーバー</p>
+                <span class="text-xs bg-indigo-100 text-indigo-700 rounded-full px-2 py-0.5">意匠性×耐久性×メンテフリー</span>
+                <p class="text-xs text-gray-500 mt-1">📣 設計事務所</p>
+              </div>
+              <div class="bg-teal-50 border border-teal-100 rounded-lg p-2.5">
+                <p class="text-xs font-bold text-gray-800">エポキシ × 合成樹脂系塗り床</p>
+                <span class="text-xs bg-teal-100 text-teal-700 rounded-full px-2 py-0.5">耐薬品×防塵×省施工</span>
+                <p class="text-xs text-gray-500 mt-1">📣 GC・元請け</p>
+              </div>
+              <div class="bg-amber-50 border border-amber-100 rounded-lg p-2.5">
+                <p class="text-xs font-bold text-gray-800">アルミ形材 × 庇・ライトシェルフ</p>
+                <span class="text-xs bg-amber-100 text-amber-700 rounded-full px-2 py-0.5">省エネ×採光×意匠</span>
+                <p class="text-xs text-gray-500 mt-1">📣 設計事務所</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右ペイン -->
+          <div class="p-4 bg-white">
+            <div class="flex items-center gap-1.5 mb-3">
+              <span class="w-5 h-5 rounded-full bg-violet-500 text-white text-xs font-bold flex items-center justify-center">C</span>
+              <span class="text-xs font-bold text-gray-700">提案書</span>
+            </div>
+            <div class="space-y-2">
+              <div class="bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-lg p-3 text-white">
+                <p class="text-xs opacity-70">商品名</p>
+                <p class="text-sm font-bold">セラミコートルーバーSX</p>
+                <p class="text-xs opacity-80 italic mt-1">"退色ゼロ、メンテフリーの外装美"</p>
+              </div>
+              <div class="text-xs text-gray-700 bg-gray-50 rounded-lg p-2">
+                <p class="font-semibold text-gray-600 mb-1">💴 想定価格帯</p>
+                <p>28,000〜45,000円/m²</p>
+              </div>
+              <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-2 text-xs">
+                <p class="font-semibold text-indigo-700 mb-1">🎤 設計事務所への訴求</p>
+                <p class="text-gray-600 leading-relaxed">BIMデータ提供可。退色なしで意匠を長期維持</p>
+              </div>
+              <button class="w-full border border-gray-200 text-gray-600 text-xs py-1.5 rounded-lg">📋 提案書をコピー</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ラベル -->
+        <div class="grid grid-cols-3 bg-gray-50 border-t border-gray-100">
+          <div class="p-3 text-center">
+            <span class="text-xs text-teal-600 font-medium">A：材料を入れる場所</span>
+            <p class="text-xs text-gray-400 mt-0.5">自由入力 or タグ選択</p>
+          </div>
+          <div class="p-3 text-center">
+            <span class="text-xs text-indigo-600 font-medium">B：アイデアが並ぶ場所</span>
+            <p class="text-xs text-gray-400 mt-0.5">クリックで選択</p>
+          </div>
+          <div class="p-3 text-center">
+            <span class="text-xs text-violet-600 font-medium">C：提案書が出る場所</span>
+            <p class="text-xs text-gray-400 mt-0.5">コピーして即使える</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ③ 操作フロー -->
+    <section class="mb-10">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">3</span>
+        <h2 class="text-sm font-bold text-gray-800">使うときの流れ（5ステップ）</h2>
+      </div>
+
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-indigo-50">
+        <div class="flex flex-col items-center gap-0">
+
+          <!-- Step 1 -->
+          <div class="w-full max-w-sm bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-center">
+            <div class="w-8 h-8 rounded-full bg-indigo-600 text-white text-sm font-bold flex items-center justify-center mx-auto mb-2">1</div>
+            <p class="text-sm font-bold text-indigo-800">「🎭 デモ」ボタンを押す</p>
+            <p class="text-xs text-indigo-600 mt-1">ヘッダー右上にあるボタン。押すと青くなる</p>
+          </div>
+          <div class="h-6 flex flex-col items-center justify-center"><div class="w-0.5 h-full bg-indigo-300"></div></div>
+
+          <!-- Step 2 -->
+          <div class="w-full max-w-sm bg-teal-50 border border-teal-100 rounded-xl p-4 text-center">
+            <div class="w-8 h-8 rounded-full bg-teal-600 text-white text-sm font-bold flex items-center justify-center mx-auto mb-2">2</div>
+            <p class="text-sm font-bold text-teal-800">左ペインで施設カテゴリを確認</p>
+            <p class="text-xs text-teal-600 mt-1">「工場向け」「医療向け」など、ターゲットを絞るとアイデアが的確になる</p>
+          </div>
+          <div class="h-6 flex flex-col items-center justify-center"><div class="w-0.5 h-full bg-indigo-300"></div></div>
+
+          <!-- Step 3 -->
+          <div class="w-full max-w-sm bg-amber-50 border border-amber-100 rounded-xl p-4 text-center">
+            <div class="w-8 h-8 rounded-full bg-amber-500 text-white text-sm font-bold flex items-center justify-center mx-auto mb-2">3</div>
+            <p class="text-sm font-bold text-amber-800">「▶ アイデアを生成」を押す</p>
+            <p class="text-xs text-amber-600 mt-1">約1秒後に中央ペインにアイデアカードが5件表示される</p>
+          </div>
+          <div class="h-6 flex flex-col items-center justify-center"><div class="w-0.5 h-full bg-indigo-300"></div></div>
+
+          <!-- Step 4 -->
+          <div class="w-full max-w-sm bg-violet-50 border border-violet-100 rounded-xl p-4 text-center">
+            <div class="w-8 h-8 rounded-full bg-violet-600 text-white text-sm font-bold flex items-center justify-center mx-auto mb-2">4</div>
+            <p class="text-sm font-bold text-violet-800">気に入ったカードをクリック</p>
+            <p class="text-xs text-violet-600 mt-1">カードを選ぶと右ペインに提案書が自動で展開される</p>
+          </div>
+          <div class="h-6 flex flex-col items-center justify-center"><div class="w-0.5 h-full bg-indigo-300"></div></div>
+
+          <!-- Step 5 -->
+          <div class="w-full max-w-sm bg-green-50 border border-green-100 rounded-xl p-4 text-center">
+            <div class="w-8 h-8 rounded-full bg-green-600 text-white text-sm font-bold flex items-center justify-center mx-auto mb-2">5</div>
+            <p class="text-sm font-bold text-green-800">「📋 提案書をコピー」を押す</p>
+            <p class="text-xs text-green-600 mt-1">会議資料・メール・チャットにそのまま貼り付けできる</p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ④ 2つのモード比較 -->
+    <section class="mb-10">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">4</span>
+        <h2 class="text-sm font-bold text-gray-800">2つの動かし方（モード）</h2>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+
+        <!-- デモモード -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm border-2 border-indigo-200">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-xl">🎭</span>
+            <div>
+              <p class="text-sm font-bold text-indigo-700">デモモード</p>
+              <p class="text-xs text-gray-400">今すぐ使える</p>
+            </div>
+            <span class="ml-auto badge bg-green-100 text-green-600">推奨</span>
+          </div>
+
+          <!-- 仕組み図 -->
+          <div class="bg-gray-50 rounded-xl p-3 mb-3">
+            <div class="flex flex-col items-center gap-1 text-xs text-center">
+              <div class="bg-white border border-gray-200 rounded-lg px-3 py-2 w-full">
+                👆 生成ボタンを押す
+              </div>
+              <div class="text-gray-400 text-lg">↓</div>
+              <div class="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 w-full">
+                📦 ツール内のサンプルデータ<br>
+                <span class="text-gray-400">（最初から入ってる）</span>
+              </div>
+              <div class="text-gray-400 text-lg">↓</div>
+              <div class="bg-white border border-gray-200 rounded-lg px-3 py-2 w-full">
+                ✅ アイデアが表示される
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-xs">
+            <div class="flex items-center gap-2"><span class="text-green-500">✓</span><span>APIキー不要</span></div>
+            <div class="flex items-center gap-2"><span class="text-green-500">✓</span><span>インターネット不要</span></div>
+            <div class="flex items-center gap-2"><span class="text-green-500">✓</span><span>会議のデモ・説明に最適</span></div>
+            <div class="flex items-center gap-2"><span class="text-amber-400">△</span><span>内容は固定サンプル5件</span></div>
+          </div>
+        </div>
+
+        <!-- AIモード -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-200">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-xl">🤖</span>
+            <div>
+              <p class="text-sm font-bold text-gray-700">AIモード</p>
+              <p class="text-xs text-gray-400">APIキーが必要</p>
+            </div>
+          </div>
+
+          <!-- 仕組み図 -->
+          <div class="bg-gray-50 rounded-xl p-3 mb-3">
+            <div class="flex flex-col items-center gap-1 text-xs text-center">
+              <div class="bg-white border border-gray-200 rounded-lg px-3 py-2 w-full">
+                👆 生成ボタンを押す
+              </div>
+              <div class="text-gray-400 text-lg">↓</div>
+              <div class="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 w-full">
+                🌐 インターネット経由で<br>AIサービスに質問を送る
+              </div>
+              <div class="text-gray-400 text-lg">↓</div>
+              <div class="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 w-full">
+                💬 AIが考えて返答する<br>
+                <span class="text-gray-400">（Gemini / ChatGPT 等）</span>
+              </div>
+              <div class="text-gray-400 text-lg">↓</div>
+              <div class="bg-white border border-gray-200 rounded-lg px-3 py-2 w-full">
+                ✅ アイデアが表示される
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 text-xs">
+            <div class="flex items-center gap-2"><span class="text-green-500">✓</span><span>毎回ランダムな新アイデアが出る</span></div>
+            <div class="flex items-center gap-2"><span class="text-green-500">✓</span><span>入力内容に合わせた本格的な提案</span></div>
+            <div class="flex items-center gap-2"><span class="text-red-400">✗</span><span>APIキー（合言葉）の取得が必要</span></div>
+            <div class="flex items-center gap-2"><span class="text-red-400">✗</span><span>無料枠の上限で使えなくなることも</span></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ⑤ APIキーとは -->
+    <section class="mb-10">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">5</span>
+        <h2 class="text-sm font-bold text-gray-800">「APIキー」ってなに？</h2>
+      </div>
+
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-indigo-50">
+        <div class="grid grid-cols-3 gap-4 items-center text-center text-xs mb-5">
+          <div class="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+            <div class="text-3xl mb-2">🖥️</div>
+            <p class="font-bold text-gray-800">このツール<br>（ブラウザ）</p>
+            <p class="text-gray-400 mt-1">質問を送る側</p>
+          </div>
+          <div class="flex flex-col items-center gap-2">
+            <div class="text-gray-400 text-xs">── APIキー付きで送信 ──▶</div>
+            <div class="bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 text-amber-700 text-xs font-medium">
+              🔑 APIキー<br>
+              <span class="text-amber-500 font-normal">= AIへの入館証</span>
+            </div>
+            <div class="text-gray-400 text-xs">◀── 回答が返ってくる ──</div>
+          </div>
+          <div class="bg-blue-50 rounded-xl p-4 border border-blue-100">
+            <div class="text-3xl mb-2">🤖</div>
+            <p class="font-bold text-gray-800">AIサービス<br>（Gemini等）</p>
+            <p class="text-gray-400 mt-1">答える側</p>
+          </div>
+        </div>
+
+        <div class="bg-amber-50 border border-amber-100 rounded-xl p-4">
+          <p class="text-xs font-bold text-amber-700 mb-2">⚠️ APIキーの注意点</p>
+          <div class="space-y-1.5 text-xs text-amber-800">
+            <div class="flex items-start gap-2"><span>•</span><span>人に見せてはいけない（銀行のパスワードと同じ感覚）</span></div>
+            <div class="flex items-start gap-2"><span>•</span><span>GitHubなどに間違ってアップロードしないよう注意</span></div>
+            <div class="flex items-start gap-2"><span>•</span><span>このツールはキーをあなたのブラウザ内にのみ保存（外部サーバーには送らない）</span></div>
+            <div class="flex items-start gap-2"><span>•</span><span>無料枠（1分間の上限）を超えると「429エラー」が出る</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ⑥ 使うシーン -->
+    <section class="mb-10">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">6</span>
+        <h2 class="text-sm font-bold text-gray-800">どんなシーンで使う？</h2>
+      </div>
+
+      <div class="grid grid-cols-3 gap-3">
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center">
+          <div class="text-2xl mb-2">📋</div>
+          <p class="text-xs font-bold text-gray-800 mb-1">企画会議の前日</p>
+          <p class="text-xs text-gray-500 leading-relaxed">デモモードで叩き台を10件。「こんなアイデアどう？」の出発点に</p>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center">
+          <div class="text-2xl mb-2">🤝</div>
+          <p class="text-xs font-bold text-gray-800 mb-1">商談前の準備</p>
+          <p class="text-xs text-gray-500 leading-relaxed">施設カテゴリを「医療向け」に絞って、相手に刺さる提案書を生成</p>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center">
+          <div class="text-2xl mb-2">💡</div>
+          <p class="text-xs font-bold text-gray-800 mb-1">アイデア出しの壁打ち</p>
+          <p class="text-xs text-gray-500 leading-relaxed">「この素材、何に使えるかな」を数秒で複数案。発想の広がりに</p>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- フッター -->
+    <div class="text-center text-xs text-gray-400 mt-6 pb-6">
+      <p>🏗️ 新商品提案ツール｜ABC商会 建築建材</p>
+      <p class="mt-1">ツールURL：<a href="http://localhost:3333" class="text-indigo-500 underline">http://localhost:3333</a></p>
+    </div>
+
+  </div>
+</body>
+</html>
